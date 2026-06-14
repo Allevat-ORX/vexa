@@ -11,6 +11,7 @@ Retries with exponential backoff (default: 1s, 5s, 30s).
 from __future__ import annotations
 
 import asyncio
+import os
 import json
 import logging
 import time
@@ -23,6 +24,8 @@ from runtime_api.backends import Backend
 from runtime_api.profiles import get_profile
 
 logger = logging.getLogger("runtime_api.lifecycle")
+
+INTERNAL_API_SECRET = os.getenv("INTERNAL_API_SECRET", "")
 
 
 async def idle_loop(redis, backend: Backend) -> None:
@@ -247,7 +250,10 @@ async def _deliver_callback(redis, name: str) -> None:
     for attempt in range(config.CALLBACK_RETRIES):
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(url, json=payload)
+                headers = {}
+                if INTERNAL_API_SECRET:
+                    headers["X-Internal-Secret"] = INTERNAL_API_SECRET
+                resp = await client.post(url, json=payload, headers=headers)
                 if resp.status_code < 400:
                     logger.info(f"Callback delivered for {name} -> {url} (attempt {attempt + 1})")
                     await state.delete_pending_callback(redis, name)
