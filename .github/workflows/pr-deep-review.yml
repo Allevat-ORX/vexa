@@ -1,0 +1,83 @@
+name: PR Deep Review (Layer 3)
+
+# Layer 3: Deep AI review via review-pr.sh + qwen3-coder:480b (Ollama Cloud)
+# Triggers immediately on PR open/update. Manual trigger: /deep-review comment
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    branches:
+      - main
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: pr-deep-review-${{ github.event.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  deep-review:
+    name: Deep Review (qwen3-coder:480b)
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/deep-review'))
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Get PR number
+        id: pr
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "repo=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+            echo "repo=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup hermes wrapper + review script
+        env:
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_CLOUD_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$HOME/.local/bin"
+
+          if [[ -z "${OLLAMA_API_KEY}" ]]; then
+            echo "ERROR: OLLAMA_CLOUD_API_KEY secret not configured"
+            exit 1
+          fi
+
+          HERMES_BIN="$HOME/.local/bin/hermes"
+          if [[ ! -x "$HERMES_BIN" ]] || ! "$HERMES_BIN" --version &>/dev/null 2>&1; then
+            printf '%s' "${OLLAMA_API_KEY}" > "$HOME/.local/bin/.ollama_key"
+            chmod 600 "$HOME/.local/bin/.ollama_key"
+            printf '%s' 'IyEvdXNyL2Jpbi9lbnYgYmFzaAojIGhlcm1lcyBjdXJsIHdyYXBwZXIgLSBPbGxhbWEgQ2xvdWQgQVBJCk1PREVMPSJxd2VuMy1jb2Rlcjo0ODBiIgpQUk9NUFQ9IiIKU1VCQ01EPSIiCndoaWxlIFtbICQjIC1ndCAwIF1dOyBkbwogIGNhc2UgIiQxIiBpbgogICAgY2hhdCkgU1VCQ01EPSJjaGF0Ijsgc2hpZnQgOzsKICAgIHNlbmQpIGV4aXQgMCA7OwogICAgLS12ZXJzaW9uKSBlY2hvICJoZXJtZXMtY3VybC13cmFwcGVyIHYxLjAiOyBleGl0IDAgOzsKICAgIC1tKSBNT0RFTD0iJDIiOyBzaGlmdCAyIDs7CiAgICAtUSkgc2hpZnQgOzsKICAgIC1xKSBQUk9NUFQ9IiQyIjsgc2hpZnQgMiA7OwogICAgKikgc2hpZnQgOzsKICBlc2FjCmRvbmUKW1sgIiRTVUJDTUQiICE9ICJjaGF0IiB8fCAteiAiJFBST01QVCIgXV0gJiYgeyBlY2hvICJVc2FnZTogaGVybWVzIGNoYXQgLW0gTU9ERUwgLVEgLXEgUFJPTVBUIiA+JjI7IGV4aXQgMTsgfQpLRVlfRklMRT0iJChkaXJuYW1lICIkKHJlYWxwYXRoICIkMCIpIikvLm9sbGFtYV9rZXkiCkFQSV9LRVk9IiQoY2F0ICIkS0VZX0ZJTEUiIDI+L2Rldi9udWxsKSIKW1sgLXogIiRBUElfS0VZIiBdXSAmJiB7IGVjaG8gIk5vIEFQSSBrZXkiID4mMjsgZXhpdCAxOyB9CkVTQ0FQRUQ9JChweXRob24zIC1jICJpbXBvcnQgc3lzLGpzb247IHByaW50KGpzb24uZHVtcHMoc3lzLnN0ZGluLnJlYWQoKSkpIiA8PDwgIiRQUk9NUFQiKQpSRVNQT05TRT0kKGN1cmwgLXMgImh0dHBzOi8vb2xsYW1hLmNvbS92MS9jaGF0L2NvbXBsZXRpb25zIiAtSCAiQXV0aG9yaXphdGlvbjogQmVhcmVyICRBUElfS0VZIiAtSCAiQ29udGVudC1UeXBlOiBhcHBsaWNhdGlvbi9qc29uIiAtZCAie1wibW9kZWxcIjpcIiRNT0RFTFwiLFwibWVzc2FnZXNcIjpbe1wicm9sZVwiOlwidXNlclwiLFwiY29udGVudFwiOiRFU0NBUEVEfV0sXCJzdHJlYW1cIjpmYWxzZX0iIC0tbWF4LXRpbWUgMzAwIDI+L2Rldi9udWxsKQpweXRob24zIC1jICJpbXBvcnQgc3lzLGpzb247IHI9anNvbi5sb2FkcyhzeXMuYXJndlsxXSk7IHByaW50KHJbJ2Nob2ljZXMnXVswXVsnbWVzc2FnZSddWydjb250ZW50J10pIiAiJFJFU1BPTlNFIgo=' | base64 -d > "$HERMES_BIN"
+            chmod +x "$HERMES_BIN"
+            echo "hermes wrapper created"
+          fi
+
+          REVIEW_SCRIPT="$HOME/.local/bin/review-pr.sh"
+          if [[ ! -x "$REVIEW_SCRIPT" ]]; then
+            SCRIPT_CONTENT=$(gh api repos/Allevat-ORX/OnRentX-AI-System/contents/scripts/review-pr.sh --jq '.content' 2>&1)
+            if [[ -z "$SCRIPT_CONTENT" ]] || echo "$SCRIPT_CONTENT" | grep -q '"message"'; then
+              echo "ERROR: Failed to fetch review-pr.sh"
+              exit 1
+            fi
+            echo "$SCRIPT_CONTENT" | base64 -d > "$REVIEW_SCRIPT"
+            chmod +x "$REVIEW_SCRIPT"
+          fi
+
+      - name: Run deep review (background)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REVIEW_SCRIPT="$HOME/.local/bin/review-pr.sh"
+          PR_NUM="${{ steps.pr.outputs.number }}"
+          REPO="${{ steps.pr.outputs.repo }}"
+          LOG="/tmp/deep-review-${PR_NUM}.log"
+          nohup "$REVIEW_SCRIPT" "$PR_NUM" "$REPO" > "$LOG" 2>&1 &
+          echo "PID: $! — log: $LOG"
+          echo "Review running in background with qwen3-coder:480b (3-5 min)"

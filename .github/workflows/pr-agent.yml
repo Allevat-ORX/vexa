@@ -1,0 +1,66 @@
+name: PR Agent AI Review
+
+# Layer 2: AI code review via PR-Agent + LiteLLM deepseek-coder (Oracle VM)
+# Commands: /review /ask /improve /describe /help
+# Triggers on new PR or /command comment
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    branches:
+      - main
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: pr-agent-${{ github.event.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  pr-agent:
+    name: AI Code Review (deepseek-coder)
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       github.actor != 'github-actions[bot]' &&
+       startsWith(github.event.comment.body, '/'))
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PR-Agent
+        run: pip install pr-agent --quiet
+
+      - name: Run PR-Agent
+        env:
+          CONFIG__MODEL: "litellm_proxy/deepseek-coder"
+          OPENAI__KEY: ${{ secrets.LITELLM_API_KEY }}
+          OPENAI__API_BASE: "http://159.54.142.132:4000/v1"
+          GITHUB__USER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          PR_HTML_URL: ${{ github.event.pull_request.html_url }}
+          ISSUE_PR_URL: ${{ github.event.issue.pull_request.url }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            PR_URL="$PR_HTML_URL"
+            COMMAND="review"
+          else
+            PR_URL=$(echo "$ISSUE_PR_URL" | sed 's|api.github.com/repos|github.com|' | sed 's|/pulls/|/pull/|')
+            COMMAND=$(echo "$COMMENT_BODY" | awk '{print $1}' | sed 's|/||')
+          fi
+          echo "PR URL: $PR_URL"
+          echo "Command: $COMMAND"
+          python -m pr_agent.cli --pr_url="$PR_URL" "$COMMAND"
