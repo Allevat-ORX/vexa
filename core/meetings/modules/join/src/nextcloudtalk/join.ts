@@ -91,13 +91,25 @@ export async function joinNextcloudTalkMeeting(
         const joinBtn = page.locator(joinSel).first();
         if (await joinBtn.isVisible()) {
           await joinBtn.click();
-          log(`[NextcloudTalk] Clicked join button via selector: ${joinSel}`);
+          log(`[NextcloudTalk] Clicked initial join button via selector: ${joinSel}`);
           await page.waitForTimeout(2000);
           break;
         }
       } catch {
         // try next join selector
       }
+    }
+
+    // Nextcloud Talk shows a pre-call media modal dialog with a second join button
+    try {
+      const modalJoinBtn = page.locator('div[role="dialog"] button:has-text("Inicia"), div[role="dialog"] button:has-text("Start"), div[role="dialog"] button:has-text("Join"), div.modal button.start-call-button--split').first();
+      if (await modalJoinBtn.isVisible({ timeout: 4000 })) {
+        await modalJoinBtn.click();
+        log('[NextcloudTalk] Clicked modal dialog join confirmation button');
+        await page.waitForTimeout(2000);
+      }
+    } catch {
+      // modal not present or already joined
     }
   }
 
