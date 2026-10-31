@@ -23,6 +23,7 @@ import { joinJitsiMeeting, buildJitsiMeetingUrl } from "./jitsi/join";
 import { waitForJitsiMeetingAdmission, checkForJitsiAdmissionSilent } from "./jitsi/admission";
 import { leaveJitsiMeeting } from "./jitsi/leave";
 import { startJitsiRemovalMonitor } from "./jitsi/removal";
+import { joinNextcloudTalkMeeting, waitForNextcloudTalkAdmission, leaveNextcloudTalk } from "./nextcloudtalk";
 import { startDebugView } from "./shared/escalation";
 import { setHooks, type BotConfig, type Hooks, type JoinState } from "./_host";
 import { JOIN_BROWSER_ARGS, getJoinBrowserArgs } from "./browser-args";
@@ -33,7 +34,7 @@ export { startDebugView, setHooks };
 // build on this ONE set (browser-args.ts), so join↔bot flags never drift.
 export { JOIN_BROWSER_ARGS, getJoinBrowserArgs };
 
-export type Platform = "google_meet" | "teams" | "zoom" | "jitsi";
+export type Platform = "google_meet" | "teams" | "zoom" | "jitsi" | "nextcloud_talk";
 
 export interface JoinResult {
   admitted: boolean;
@@ -71,6 +72,7 @@ export function resolvePlatform(meetingUrl: string): Platform {
     const host = new URL(meetingUrl).hostname;
     if (host === "zoom.us" || host.endsWith(".zoom.us")) return "zoom";
     if (host === "meet.jit.si" || host === "8x8.vc" || host.endsWith(".8x8.vc")) return "jitsi";
+    if (meetingUrl.includes("/call/") || host.includes("axialtechinc.com") || host.includes("nextcloud")) return "nextcloud_talk";
   } catch { /* fall through to throw below */ }
   throw new Error(`Cannot infer platform from meeting URL: ${meetingUrl}`);
 }
@@ -124,6 +126,9 @@ export async function joinMeeting(page: Page, opts: JoinOptions): Promise<JoinRe
     admitted = await waitForGoogleMeetingAdmission(
       page, botConfig.automaticLeave!.waitingRoomTimeout, botConfig,
     );
+  } else if (platform === "nextcloud_talk") {
+    const res = await joinNextcloudTalkMeeting(page, { ...botConfig, meetingUrl: opts.meetingUrl });
+    admitted = res.admitted;
   } else {
     // Explicit refusal, never a fallthrough: an unknown platform used to silently run the GOOGLE
     // MEET join flow against whatever URL it was handed — the wrong flow on the wrong site, failing
@@ -148,3 +153,4 @@ export { AuthSessionError } from "./googlemeet/join";
 export { joinMicrosoftTeams, waitForTeamsMeetingAdmission, checkForTeamsAdmissionSilent, prepareForTeamsRecording, leaveMicrosoftTeams, startTeamsRemovalMonitor };
 export { joinZoomMeeting, buildZoomWebClientUrl, waitForZoomMeetingAdmission, checkForZoomAdmissionSilent, leaveZoomMeeting, dismissZoomPopups, startZoomRemovalMonitor };
 export { joinJitsiMeeting, buildJitsiMeetingUrl, waitForJitsiMeetingAdmission, checkForJitsiAdmissionSilent, leaveJitsiMeeting, startJitsiRemovalMonitor };
+export { joinNextcloudTalkMeeting, waitForNextcloudTalkAdmission, leaveNextcloudTalk };
