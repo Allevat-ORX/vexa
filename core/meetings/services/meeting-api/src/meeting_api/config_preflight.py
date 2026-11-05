@@ -224,7 +224,8 @@ def _http_probe(spec: dict, env: Mapping[str, str], timeout: float) -> dict:
     body = b""
     content_type = None
     if (spec.get("payload") or "") == "audio":
-        content_type, body = audio_probe_body(spec.get("payload_model") or "whisper-1")
+        payload_model = env.get("TRANSCRIPTION_MODEL") or spec.get("payload_model") or "whisper-1"
+        content_type, body = audio_probe_body(payload_model)
     req = urllib.request.Request(url, data=body, method=(spec.get("method") or "POST"))
     if content_type:
         req.add_header("Content-Type", content_type)
