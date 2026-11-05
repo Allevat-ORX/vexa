@@ -1,12 +1,26 @@
 import type { Page } from "playwright";
 import { log, callAwaitingAdmissionCallback, BotConfig } from "../_host";
-import { nextcloudTalkInCallIndicators } from "./selectors";
+import { nextcloudTalkLeaveButtonSelectors, nextcloudTalkModalJoinSelectors } from "./selectors";
 
 export async function isAdmitted(page: Page): Promise<boolean> {
-  // Check DOM indicators for in-call state
-  for (const selector of nextcloudTalkInCallIndicators) {
+  // If pre-call modal or setup dialog is open, the bot is definitely not in the call yet
+  try {
+    const modalVisible = await page.evaluate(() => {
+      const modal = document.querySelector('div[role="dialog"], .modal-container, .modal-mask, .modal-wrapper');
+      return modal ? (modal as HTMLElement).offsetParent !== null : false;
+    });
+    if (modalVisible) {
+      return false;
+    }
+  } catch {
+    // ignore
+  }
+
+  // Canonical proof of being inside the call: leave button is visible
+  for (const selector of nextcloudTalkLeaveButtonSelectors) {
     try {
-      if (await page.locator(selector).first().isVisible()) {
+      const btn = page.locator(selector).first();
+      if (await btn.isVisible()) {
         return true;
       }
     } catch {
@@ -14,17 +28,7 @@ export async function isAdmitted(page: Page): Promise<boolean> {
     }
   }
 
-  // Check WebRTC media streams directly in page context
-  const hasMedia = await page.evaluate(() => {
-    try {
-      const mediaElements = Array.from(document.querySelectorAll('video, audio')) as (HTMLMediaElement)[];
-      return mediaElements.some(m => m.srcObject !== null || !m.paused);
-    } catch {
-      return false;
-    }
-  }).catch(() => false);
-
-  return hasMedia;
+  return false;
 }
 
 export async function waitForNextcloudTalkAdmission(
@@ -39,6 +43,20 @@ export async function waitForNextcloudTalkAdmission(
     if (await isAdmitted(page)) {
       log("Successfully admitted to Nextcloud Talk call!");
       return true;
+    }
+
+    // If modal is still visible, retry clicking modal join button
+    for (const modalJoinSel of nextcloudTalkModalJoinSelectors) {
+      try {
+        const modalBtn = page.locator(modalJoinSel).first();
+        if (await modalBtn.isVisible()) {
+          log(`[NextcloudTalk] Retrying click on modal join button via ${modalJoinSel}`);
+          await modalBtn.click({ force: true });
+          break;
+        }
+      } catch {
+        // ignore
+      }
     }
 
     // Call awaiting admission callback if still waiting

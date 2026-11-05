@@ -35,6 +35,18 @@ export const nextcloudTalkJoinButtonSelectors: string[] = [
   'button:has-text("Unirse a la llamada")',
 ];
 
+export const nextcloudTalkModalJoinSelectors: string[] = [
+  'button.join-call',
+  'div[role="dialog"] button.join-call',
+  'div[role="dialog"] button.button-vue--primary',
+  'div[role="dialog"] button:has-text("Start call")',
+  'div[role="dialog"] button:has-text("Inicia")',
+  'div[role="dialog"] button:has-text("Join")',
+  'div[role="dialog"] button:has-text("Uneix-te")',
+  '.modal-container button.join-call',
+  '.modal-mask button.join-call',
+];
+
 export const nextcloudTalkAudioToggleSelectors: string[] = [
   'button.top-bar__button-toggle-audio',
   'button[aria-label*="micro" i]',
