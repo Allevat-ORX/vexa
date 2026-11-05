@@ -104,7 +104,7 @@ export async function joinNextcloudTalkMeeting(
     try {
       const modalJoinBtn = page.locator('div[role="dialog"] button:has-text("Inicia"), div[role="dialog"] button:has-text("Start"), div[role="dialog"] button:has-text("Join"), div.modal button.start-call-button--split').first();
       if (await modalJoinBtn.isVisible({ timeout: 4000 })) {
-        await modalJoinBtn.click();
+        await modalJoinBtn.click({ force: true });
         log('[NextcloudTalk] Clicked modal dialog join confirmation button');
         await page.waitForTimeout(2000);
       }

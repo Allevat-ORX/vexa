@@ -77,6 +77,12 @@ def parse_meeting_url(raw: str, *, generic_hosts: bool = True) -> Optional[tuple
             if short:
                 return ("teams", short.group(1))
             return None
+        # Nextcloud Talk: /call/<token>
+        match_talk = re.search(r"/call/([a-zA-Z0-9_-]+)", parsed.path)
+        if match_talk:
+            token = match_talk.group(1)
+            primary_host = os.getenv("NEXTCLOUD_TALK_HOST", "workspace.axialtechinc.com").lower()
+            return ("nextcloud_talk", token if host == primary_host else f"{token}@{host}")
         # Jitsi: the canonical public deployment, plus (for a deliberately pasted link) the common
         # self-hosted conventions — a host containing "jitsi", or a bare ``meet.*`` host (jitsi's
         # own recommended naming). Known platforms are matched ABOVE, so this only fires for

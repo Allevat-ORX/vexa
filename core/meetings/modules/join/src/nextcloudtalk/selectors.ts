@@ -64,6 +64,7 @@ export const nextcloudTalkInCallIndicators: string[] = [
 
 export const nextcloudTalkLeaveButtonSelectors: string[] = [
   'button.top-bar__button-leave-call',
+  'button.leave-call',
   'button[aria-label*="Surt de la trucada" i]',
   'button[aria-label*="Leave call" i]',
   'button[aria-label*="Salir de la llamada" i]',

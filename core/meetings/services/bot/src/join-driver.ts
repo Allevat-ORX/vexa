@@ -9,8 +9,8 @@ import type { Page } from '@vexa/remote-browser';
 import {
   joinMeeting,
   AdmissionError,
-  leaveGoogleMeet, leaveMicrosoftTeams, leaveZoomMeeting, leaveJitsiMeeting,
-  startGoogleRemovalMonitor, startTeamsRemovalMonitor, startZoomRemovalMonitor, startJitsiRemovalMonitor,
+  leaveGoogleMeet, leaveMicrosoftTeams, leaveZoomMeeting, leaveJitsiMeeting, leaveNextcloudTalk,
+  startGoogleRemovalMonitor, startTeamsRemovalMonitor, startZoomRemovalMonitor, startJitsiRemovalMonitor, startNextcloudTalkRemovalMonitor,
   type JoinState, type Platform as JoinPlatform, type AdmissionOutcome,
 } from '@vexa/join';
 import type { BotStatus } from './contracts.js';
@@ -51,9 +51,9 @@ function mapState(s: JoinState): BotStatus | null {
   }
 }
 
-/** Map the bot's platform string to @vexa/join's Platform ('teams' | 'zoom' | 'jitsi' | 'google_meet'). */
+/** Map the bot's platform string to @vexa/join's Platform ('teams' | 'zoom' | 'jitsi' | 'nextcloud_talk' | 'google_meet'). */
 function joinPlatform(p: string): JoinPlatform {
-  return (p === 'teams' || p === 'zoom' || p === 'jitsi') ? p : 'google_meet';
+  return (p === 'teams' || p === 'zoom' || p === 'jitsi' || p === 'nextcloud_talk') ? p : 'google_meet';
 }
 
 export function createBrowserJoinDriver(page: Page, inv: Invocation): JoinDriver {
@@ -86,12 +86,14 @@ export function createBrowserJoinDriver(page: Page, inv: Invocation): JoinDriver
       if (platform === 'teams') return startTeamsRemovalMonitor(page, cb);
       if (platform === 'zoom')  return startZoomRemovalMonitor(page, cb);
       if (platform === 'jitsi') return startJitsiRemovalMonitor(page, cb);
+      if (platform === 'nextcloud_talk') return startNextcloudTalkRemovalMonitor(page, cb);
       return startGoogleRemovalMonitor(page, cb);
     },
     async leave(reason) {
       if (platform === 'teams') { await leaveMicrosoftTeams(page, undefined, reason); return; }
       if (platform === 'zoom')  { await leaveZoomMeeting(page, undefined, reason); return; }
       if (platform === 'jitsi') { await leaveJitsiMeeting(page, undefined, reason); return; }
+      if (platform === 'nextcloud_talk') { await leaveNextcloudTalk(page, undefined, reason); return; }
       await leaveGoogleMeet(page, undefined, reason);
     },
     async withdraw(reason) {
@@ -106,10 +108,11 @@ export function createBrowserJoinDriver(page: Page, inv: Invocation): JoinDriver
       //     it is also the universal fallback if the cancel click missed. Closing the page after the
       //     click is harmless (the click already fired).
       try {
-        if (platform === 'teams')      await leaveMicrosoftTeams(page, undefined, reason);
-        else if (platform === 'zoom')  await leaveZoomMeeting(page, undefined, reason);
-        else if (platform === 'jitsi') await leaveJitsiMeeting(page, undefined, reason);
-        else                           await leaveGoogleMeet(page, undefined, reason);
+        if (platform === 'teams')           await leaveMicrosoftTeams(page, undefined, reason);
+        else if (platform === 'zoom')       await leaveZoomMeeting(page, undefined, reason);
+        else if (platform === 'jitsi')      await leaveJitsiMeeting(page, undefined, reason);
+        else if (platform === 'nextcloud_talk') await leaveNextcloudTalk(page, undefined, reason);
+        else                                await leaveGoogleMeet(page, undefined, reason);
       } catch { /* best-effort: fall through to the guaranteed page close */ }
       try {
         if (!page.isClosed()) await page.close({ runBeforeUnload: false });

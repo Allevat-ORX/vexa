@@ -96,6 +96,12 @@ async def _resolve_transcription_backend(user_id: int) -> dict:
 def construct_meeting_url(platform: str, native_meeting_id: str) -> Optional[str]:
     """Best-effort meeting URL for ``(platform, native_id)`` (zoom needs more than the id →
     None; the caller may pass an explicit ``meeting_url`` instead)."""
+    if platform == "nextcloud_talk":
+        if "@" in native_meeting_id:
+            token, host = native_meeting_id.split("@", 1)
+            return f"https://{host}/call/{token}"
+        primary_host = os.getenv("NEXTCLOUD_TALK_HOST", "workspace.axialtechinc.com")
+        return f"https://{primary_host}/call/{native_meeting_id}"
     tmpl = _URL_TEMPLATES.get(platform)
     return tmpl.format(native_meeting_id=native_meeting_id) if tmpl else None
 

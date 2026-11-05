@@ -626,3 +626,16 @@ def test_native_meeting_id_bounds_do_not_validate_SHAPE(monkeypatch):
             "platform": "google_meet", "native_meeting_id": odd_but_legal,
         })
         assert r.status_code == 201, f"{odd_but_legal!r} was refused: {r.status_code} {r.text}"
+
+
+def test_nextcloud_talk_spawn_success(monkeypatch):
+    """Nextcloud Talk meetings can be spawned via URL or platform+token."""
+    monkeypatch.setenv("ADMIN_TOKEN", "test-admin-token")
+    repo = InMemoryMeetingRepo()
+    r = _client(repo).post("/bots", headers=HEADERS, json={
+        "meeting_url": "https://workspace.axialtechinc.com/call/tsibay4z",
+    })
+    assert r.status_code == 201, f"spawn failed: {r.status_code} {r.text}"
+    body = r.json()
+    assert body["platform"] == "nextcloud_talk"
+    assert body["native_meeting_id"] == "tsibay4z"

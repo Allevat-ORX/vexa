@@ -33,7 +33,7 @@ export async function leaveNextcloudTalk(
       try {
         const btn = page.locator(selector).first();
         if (await btn.isVisible()) {
-          await btn.click();
+          await btn.click({ force: true });
           log(`[NextcloudTalk] Clicked leave button (selector: ${selector})`);
           await page.waitForTimeout(1000);
           return true;

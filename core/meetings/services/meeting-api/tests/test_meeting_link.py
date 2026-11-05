@@ -107,3 +107,25 @@ class TestConstructMeetingUrl:
 
     def test_zoom_still_requires_explicit_url(self):
         assert construct_meeting_url("zoom", "84335626851") is None
+
+    def test_nextcloud_talk_bare_token_construct(self):
+        assert construct_meeting_url("nextcloud_talk", "tsibay4z") == "https://workspace.axialtechinc.com/call/tsibay4z"
+
+    def test_nextcloud_talk_scoped_construct(self):
+        assert construct_meeting_url("nextcloud_talk", "myroom@cloud.example.org") == "https://cloud.example.org/call/myroom"
+
+
+class TestParseNextcloudTalk:
+    def test_axial_workspace_call(self):
+        assert parse_meeting_url("https://workspace.axialtechinc.com/call/tsibay4z") == ("nextcloud_talk", "tsibay4z")
+
+    def test_custom_nextcloud_call(self):
+        assert parse_meeting_url("https://cloud.example.org/call/room123") == ("nextcloud_talk", "room123@cloud.example.org")
+
+    def test_find_meeting_link_nextcloud(self):
+        text = "Meeting at https://workspace.axialtechinc.com/call/tsibay4z tomorrow"
+        assert find_meeting_link(text) == (
+            "nextcloud_talk",
+            "tsibay4z",
+            "https://workspace.axialtechinc.com/call/tsibay4z",
+        )
