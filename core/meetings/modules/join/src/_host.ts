@@ -92,3 +92,6 @@ export async function stopZoomRecording(page?: any, botConfig?: BotConfig): Prom
 export async function stopJitsiRecording(page?: any, botConfig?: BotConfig): Promise<void> {
   await hooks.onStopRecording(page, botConfig as BotConfig);
 }
+export async function stopNextcloudRecording(page?: any, botConfig?: BotConfig): Promise<void> {
+  await hooks.onStopRecording(page, botConfig as BotConfig);
+}

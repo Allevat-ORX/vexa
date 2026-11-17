@@ -41,6 +41,20 @@ def _configured_jitsi_hosts() -> set[str]:
     return {h.strip().lower() for h in raw.split(",") if h.strip()}
 
 
+#: Nextcloud Talk room links are deployment-scoped (``https://<host>/call/<room-token>``), so the
+#: platform is recognised ONLY from an explicitly declared ``VEXA_NEXTCLOUD_HOSTS`` list — never
+#: from naming heuristics (a Nextcloud host can be anything). The native id is the bare token,
+#: matching the bot's Talk join (which navigates to the caller-supplied URL verbatim).
+_NEXTCLOUD_ROOM = re.compile(r"^/call/([^/?#]+)")
+
+
+def _configured_nextcloud_hosts() -> set[str]:
+    """Deployment-declared Nextcloud Talk hostnames (``VEXA_NEXTCLOUD_HOSTS``, comma-separated).
+    Honoured in every mode, like VEXA_JITSI_HOSTS, so a pasted link AND an ICS scan both resolve."""
+    raw = os.getenv("VEXA_NEXTCLOUD_HOSTS", "")
+    return {h.strip().lower() for h in raw.split(",") if h.strip()}
+
+
 def parse_meeting_url(raw: str, *, generic_hosts: bool = True) -> Optional[tuple[str, str]]:
     """Parse a pasted meeting URL (or bare id) → ``(platform, native_meeting_id)``, or ``None``
     when nothing valid can be extracted. Accepts the same inputs the terminal's
@@ -106,6 +120,11 @@ def parse_meeting_url(raw: str, *, generic_hosts: bool = True) -> Optional[tuple
             # (platform, native_meeting_id) key: duplicate checks, calendar adoption, MCP
             # idempotency. meet.jit.si keeps the bare room (canonical, unambiguous).
             return ("jitsi", room if host == "meet.jit.si" else f"{room}@{host}")
+        # Nextcloud Talk: only a declared host resolves to a platform; the native id is the
+        # /call/<token> segment, kept bare (the bot joins on the caller-supplied URL).
+        if host in _configured_nextcloud_hosts():
+            m = _NEXTCLOUD_ROOM.match(parsed.path)
+            return ("nextcloud_talk", m.group(1)) if m else None
         return None
 
     # Bare numeric id → assume Zoom

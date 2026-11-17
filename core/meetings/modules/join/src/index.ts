@@ -23,6 +23,10 @@ import { joinJitsiMeeting, buildJitsiMeetingUrl } from "./jitsi/join";
 import { waitForJitsiMeetingAdmission, checkForJitsiAdmissionSilent } from "./jitsi/admission";
 import { leaveJitsiMeeting } from "./jitsi/leave";
 import { startJitsiRemovalMonitor } from "./jitsi/removal";
+import { joinNextcloudTalk, buildNextcloudTalkMeetingUrl } from "./nextcloudtalk/join";
+import { waitForNextcloudTalkAdmission, checkForNextcloudTalkAdmissionSilent } from "./nextcloudtalk/admission";
+import { prepareForRecording as prepareForNextcloudRecording, leaveNextcloudTalk } from "./nextcloudtalk/leave";
+import { startNextcloudTalkRemovalMonitor } from "./nextcloudtalk/removal";
 import { startDebugView } from "./shared/escalation";
 import { setHooks, type BotConfig, type Hooks, type JoinState } from "./_host";
 import { JOIN_BROWSER_ARGS, getJoinBrowserArgs } from "./browser-args";
@@ -33,7 +37,7 @@ export { startDebugView, setHooks };
 // build on this ONE set (browser-args.ts), so join↔bot flags never drift.
 export { JOIN_BROWSER_ARGS, getJoinBrowserArgs };
 
-export type Platform = "google_meet" | "teams" | "zoom" | "jitsi";
+export type Platform = "google_meet" | "teams" | "zoom" | "jitsi" | "nextcloud_talk";
 
 export interface JoinResult {
   admitted: boolean;
@@ -71,6 +75,14 @@ export function resolvePlatform(meetingUrl: string): Platform {
     const host = new URL(meetingUrl).hostname;
     if (host === "zoom.us" || host.endsWith(".zoom.us")) return "zoom";
     if (host === "meet.jit.si" || host === "8x8.vc" || host.endsWith(".8x8.vc")) return "jitsi";
+    // Nextcloud Talk is deployment-scoped (an arbitrary self-hosted host), so it is inferred ONLY
+    // from the explicitly declared VEXA_NEXTCLOUD_HOSTS list (comma-separated), mirroring the
+    // VEXA_JITSI_HOSTS opt-in for self-hosted Jitsi.
+    const declared = (process.env.VEXA_NEXTCLOUD_HOSTS || "")
+      .split(",")
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean);
+    if (declared.includes(host.toLowerCase())) return "nextcloud_talk";
   } catch { /* fall through to throw below */ }
   throw new Error(`Cannot infer platform from meeting URL: ${meetingUrl}`);
 }
@@ -119,6 +131,11 @@ export async function joinMeeting(page: Page, opts: JoinOptions): Promise<JoinRe
     admitted = await waitForJitsiMeetingAdmission(
       page, botConfig.automaticLeave!.waitingRoomTimeout, botConfig,
     );
+  } else if (platform === "nextcloud_talk") {
+    await joinNextcloudTalk(page, opts.meetingUrl, botConfig.botName!, botConfig);
+    admitted = await waitForNextcloudTalkAdmission(
+      page, botConfig.automaticLeave!.waitingRoomTimeout, botConfig,
+    );
   } else if (platform === "google_meet") {
     await joinGoogleMeeting(page, opts.meetingUrl, botConfig.botName!, botConfig);
     admitted = await waitForGoogleMeetingAdmission(
@@ -129,7 +146,7 @@ export async function joinMeeting(page: Page, opts: JoinOptions): Promise<JoinRe
     // MEET join flow against whatever URL it was handed — the wrong flow on the wrong site, failing
     // minutes later with misattributed selector errors instead of naming the real problem here.
     throw new Error(
-      `Unsupported platform '${platform}' — this join layer drives google_meet, teams, zoom, jitsi`,
+      `Unsupported platform '${platform}' — this join layer drives google_meet, teams, zoom, jitsi, nextcloud_talk`,
     );
   }
 
@@ -148,3 +165,4 @@ export { AuthSessionError } from "./googlemeet/join";
 export { joinMicrosoftTeams, waitForTeamsMeetingAdmission, checkForTeamsAdmissionSilent, prepareForTeamsRecording, leaveMicrosoftTeams, startTeamsRemovalMonitor };
 export { joinZoomMeeting, buildZoomWebClientUrl, waitForZoomMeetingAdmission, checkForZoomAdmissionSilent, leaveZoomMeeting, dismissZoomPopups, startZoomRemovalMonitor };
 export { joinJitsiMeeting, buildJitsiMeetingUrl, waitForJitsiMeetingAdmission, checkForJitsiAdmissionSilent, leaveJitsiMeeting, startJitsiRemovalMonitor };
+export { joinNextcloudTalk, buildNextcloudTalkMeetingUrl, waitForNextcloudTalkAdmission, checkForNextcloudTalkAdmissionSilent, prepareForNextcloudRecording, leaveNextcloudTalk, startNextcloudTalkRemovalMonitor };
